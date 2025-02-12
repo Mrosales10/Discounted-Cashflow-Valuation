@@ -1,0 +1,62 @@
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+# Function to calculate the Weighted Average Cost of Capital (WACC)
+def calculate_wacc(equity_value, debt_value, cost_of_equity, cost_of_debt, tax_rate):
+    """
+    The WACC represents the average rate a company is expected to pay to finance its assets. 
+    It is a weighted sum of the cost of equity and the after-tax cost of debt.
+    """
+    total_value = equity_value + debt_value
+    wacc = (equity_value / total_value) * cost_of_equity + (debt_value / total_value) * cost_of_debt * (1 - tax_rate)
+    return wacc
+
+# Function to calculate the market value of equity
+def calculate_equity_value(ticker):
+    """
+    Fetches the company's stock price and outstanding shares to calculate market capitalization.
+    """
+    stock = yf.Ticker(ticker)
+    try:
+        stock_price = stock.history(period='1d')['Close'][0]
+        shares_outstanding = stock.info['sharesOutstanding']
+        equity_value = stock_price * shares_outstanding
+        return equity_value
+    except Exception as e:
+        return f"Error fetching equity value: {e}"
+
+# Function to estimate the intrinsic value of a stock using the Discounted Cash Flow (DCF) model
+def discounted_cash_flow(ticker, debt_value, cost_of_equity, cost_of_debt, tax_rate, cash_flow, cash_flow_growth, terminal_growth, years=5):
+    """
+    The DCF model estimates a stock's intrinsic value by forecasting future cash flows 
+    and discounting them to the present using the WACC as the discount rate.
+    """
+    try:
+        stock = yf.Ticker(ticker)
+        outstanding_shares = stock.info['sharesOutstanding']
+        
+        equity_value = calculate_equity_value(ticker)
+        discount_rate = calculate_wacc(equity_value, debt_value, cost_of_equity, cost_of_debt, tax_rate)
+
+        projected_cash_flows = [(cash_flow * (1 + cash_flow_growth) ** i) / (1 + discount_rate) ** i for i in range(1, years + 1)]
+        terminal_value = (projected_cash_flows[-1] * (1 + terminal_growth)) / (discount_rate - terminal_growth)
+        intrinsic_value = sum(projected_cash_flows) + terminal_value / (1 + discount_rate) ** years
+        intrinsic_value_per_share = intrinsic_value / outstanding_shares
+
+        return intrinsic_value_per_share
+    except Exception as e:
+        return f"Error fetching data: {e}"
+
+# Example Usage
+ticker = 'AAPL'
+debt_value = 120000000000
+cost_of_equity = 0.08
+cost_of_debt = 0.04
+tax_rate = 0.21
+cash_flow = 100000000000
+cash_flow_growth = 0.05
+terminal_growth = 0.02
+
+evaluation = discounted_cash_flow(ticker, debt_value, cost_of_equity, cost_of_debt, tax_rate, cash_flow, cash_flow_growth, terminal_growth)
+print(f"Estimated Intrinsic Value per Share for {ticker}: ${evaluation:.2f}")
